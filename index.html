@@ -362,7 +362,7 @@
 // ============ CONFIGURATION SUPABASE — à remplacer par tes vraies valeurs ============
 const SUPABASE_URL = "https://anofluwpjikmqqxmpawn.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub2ZsdXdwamlrbXFxeG1wYXduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1OTQ4NDQsImV4cCI6MjEwNjE3MDg0NH0.LdYj-YNw6jRPtuP__GbYXMQWlIAEEu2w9s9llDhLnn0";
-const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+const supabaseClient = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
 
 // ============ FORMULAIRE REPLIÉ PAR DÉFAUT, RÉVÉLÉ AU CLIC ============
 (function(){
@@ -399,7 +399,7 @@ const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SU
     var el = e.target.closest('a, button');
     if(!el) return;
     var label = (el.textContent || el.id || 'élément').trim().slice(0,80);
-    supabase.from('page_clicks').insert([{ page:'index', element_label: label, element_id: el.id || null }]).then(function(){});
+    supabaseClient.from('page_clicks').insert([{ page:'index', element_label: label, element_id: el.id || null }]).then(function(){});
   });
 })();
 const leadForm = document.getElementById('lead-form');
@@ -409,7 +409,7 @@ leadForm.addEventListener('submit', async function(e){
   const btn = document.getElementById('lead-submit');
   const data = Object.fromEntries(new FormData(leadForm).entries());
   btn.disabled = true; btn.textContent = 'Envoi en cours…';
-  const { error } = await supabase.from('clients').insert([{
+  const { error } = await supabaseClient.from('clients').insert([{
     prenom: data.prenom, entreprise: data.entreprise, email: data.email,
     telephone: data.telephone, secteur: data.secteur, horaires: data.horaires,
     services: data.services, formule: data.formule, statut: 'nouveau'
