@@ -1,0 +1,586 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Agent IA de prise de rendez-vous</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#05070d; --ink2:#0b0f1a; --paper:#e8eaf0; --paper-dim:#7b8394;
+    --blue:#00b8ff; --gold:#d4af37; --line:rgba(232,234,240,0.12); --ink-soft:#a8adba;
+  }
+  *{box-sizing:border-box;}
+  html{scroll-behavior:smooth;}
+  body{margin:0; background:var(--ink); color:var(--paper); font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.5; font-size:17px; overflow-x:hidden;}
+  h1,h2,h3{font-family:'Bricolage Grotesque',system-ui,sans-serif; font-weight:600; margin:0; letter-spacing:-0.01em;}
+  p{margin:0;} a{color:inherit;}
+  @media (prefers-reduced-motion: reduce){ *{animation:none !important; transition:none !important;} }
+
+  /* Lumière IA qui voyage en fond, en continu */
+  .ai-glow{position:fixed; width:60vw; height:60vw; max-width:700px; max-height:700px; border-radius:50%;
+    background:radial-gradient(circle, rgba(0,184,255,0.28) 0%, rgba(0,184,255,0) 70%);
+    filter:blur(40px); mix-blend-mode:screen; pointer-events:none; z-index:1;}
+  .ai-glow.g1{top:-10%; left:-10%; animation:drift1 22s ease-in-out infinite;}
+  .ai-glow.g2{bottom:-15%; right:-10%; animation:drift2 26s ease-in-out infinite;}
+  @keyframes drift1{ 0%,100%{transform:translate(0,0);} 50%{transform:translate(30vw,20vh);} }
+  @keyframes drift2{ 0%,100%{transform:translate(0,0);} 50%{transform:translate(-25vw,-15vh);} }
+
+  nav{position:sticky; top:0; z-index:60; background:rgba(5,7,13,0.85); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:16px 24px; display:flex; justify-content:space-between; align-items:center;}
+  nav .menu{display:flex; gap:22px; font-size:14px;}
+  nav .menu a{text-decoration:none; opacity:.8;}
+  nav .menu a:hover{opacity:1; color:var(--blue);}
+  nav .brand{font-weight:600; color:var(--blue); letter-spacing:.02em;}
+
+  /* Hero avec canvas IA en fond */
+  .hero{position:relative; padding:100px 24px 120px; overflow:hidden; z-index:2;}
+  #ai-hero-canvas-wrap{position:absolute; inset:0; z-index:0; transition:opacity .1s linear;}
+  #ai-hero-canvas{width:100%; height:100%; display:block;}
+  .hero-inner{position:relative; z-index:2; max-width:920px; margin:0 auto;}
+  .hero h1{font-size:clamp(36px,7vw,68px); line-height:1.02; max-width:16ch; text-shadow:0 0 40px rgba(0,184,255,0.25);}
+  .hero .lede{margin-top:22px; font-family:'Newsreader',serif; font-size:19px; max-width:44ch; color:var(--ink-soft);}
+  .hero .tag{margin-top:12px; font-size:14px; color:var(--gold);}
+  .ctas{margin-top:32px; display:flex; flex-wrap:wrap; gap:14px;}
+  .btn{display:inline-block; padding:14px 26px; font-weight:600; font-size:15px; text-decoration:none; border-radius:2px; cursor:pointer; border:none;}
+  .btn-primary{background:var(--gold); color:#1a1404; box-shadow:0 0 24px rgba(212,175,55,0.35);}
+  .btn-ghost{background:transparent; border:1px solid rgba(0,184,255,0.4); color:var(--blue);}
+  .btn-dark{background:var(--ink2); color:var(--paper); border:1px solid var(--line);}
+
+  /* Bande stats faible opacité */
+  .stats-band{position:relative; z-index:2; border-top:1px solid var(--line); border-bottom:1px solid var(--line); padding:28px 24px; background:rgba(0,184,255,0.03);}
+  .stats-inner{max-width:920px; margin:0 auto; display:grid; grid-template-columns:repeat(3,1fr); gap:16px; text-align:center;}
+  .stat-item .num{font-size:clamp(22px,3.4vw,34px); font-weight:600; color:var(--blue); opacity:.9;}
+  .stat-item .lbl{font-size:12.5px; color:var(--paper-dim); margin-top:4px; letter-spacing:.02em;}
+
+  section{position:relative; z-index:2; padding:72px 24px;}
+  .inner{max-width:920px; margin:0 auto;}
+  .steps{display:grid; gap:24px;}
+  @media(min-width:760px){ .steps{grid-template-columns:repeat(3,1fr);} }
+  .step{border-top:2px solid var(--blue); padding-top:16px;}
+  .step .n{font-size:13px; color:var(--gold); font-weight:600;}
+  .step h3{font-size:19px; margin:8px 0;}
+  .step p{font-family:'Newsreader',serif; color:var(--ink-soft); font-size:15.5px;}
+
+  .offer{background:var(--ink2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);}
+  .offer-grid{display:grid; gap:32px;}
+  @media(min-width:760px){ .offer-grid{grid-template-columns:1fr 1fr;} }
+  .price-box{border:1px solid rgba(212,175,55,0.35); padding:28px; background:rgba(212,175,55,0.04);}
+  .price-box .amount{font-size:34px; font-weight:600; color:var(--gold);}
+  .price-box ul{list-style:none; margin:20px 0 0; padding:0; display:grid; gap:10px; font-size:14.5px;}
+  .price-box li::before{content:"· "; color:var(--blue);}
+
+  h2.section-title{font-size:clamp(24px,4vw,32px); max-width:20ch; margin-bottom:32px;}
+  .faq-item{border-bottom:1px solid var(--line);}
+  .faq-item summary{padding:18px 4px; font-size:17px; font-weight:500; cursor:pointer; list-style:none; display:flex; justify-content:space-between; align-items:center;}
+  .faq-item summary::-webkit-details-marker{display:none;}
+  .faq-item summary::after{content:"+"; color:var(--blue); font-size:20px; margin-left:12px; transition:transform .2s;}
+  .faq-item[open] summary::after{transform:rotate(45deg);}
+  .faq-item p{font-family:'Newsreader',serif; color:var(--ink-soft); font-size:15.5px; padding:0 4px 18px;}
+
+  form{display:grid; gap:12px; max-width:460px; margin-top:24px;}
+  form input, form select, form textarea{padding:12px 14px; border:1px solid var(--line); background:rgba(232,234,240,0.03); font-family:inherit; font-size:15px; color:var(--paper);}
+  form select option{background:var(--ink2); color:var(--paper);}
+  #lead-status{font-size:14px; color:var(--ink-soft);}
+  footer{position:relative; z-index:2; background:var(--ink2); color:var(--paper-dim); padding:28px 24px; font-size:13px; text-align:center; border-top:1px solid var(--line);}
+
+  /* Apparition au scroll — le contenu est visible par défaut, l'animation est un bonus ajouté par JS */
+  html.reveal-ready .reveal{opacity:0; transform:translateY(24px); transition:opacity .7s ease, transform .7s ease;}
+  html.reveal-ready .reveal.in-view{opacity:1; transform:translateY(0);}
+</style>
+</head>
+<body>
+
+<div class="ai-glow g1"></div>
+<div class="ai-glow g2"></div>
+
+<nav>
+  <div class="brand">Agent IA</div>
+  <div class="menu">
+    <a href="index.html">Accueil</a>
+    <a href="login.html">Espace client</a>
+  </div>
+</nav>
+
+<header class="hero">
+  <div id="ai-hero-canvas-wrap"><canvas id="ai-hero-canvas"></canvas></div>
+  <div class="hero-inner">
+    <h1>Ne perdez plus un seul client faute d'avoir répondu à temps</h1>
+    <p class="lede">Un agent IA répond à vos clients 24h/24 sur WhatsApp, votre site ou Instagram, et remplit votre agenda automatiquement.</p>
+    <p class="tag">Ne restez pas à la traîne — passez à l'IA, en toute sécurité.</p>
+    <div class="ctas">
+      <a class="btn btn-primary" href="#inscription">Réserver ma place</a>
+      <a class="btn btn-ghost" id="test-agent-btn" href="#">Tester l'agent en direct</a>
+    </div>
+  </div>
+</header>
+
+<div class="stats-band reveal">
+  <div class="stats-inner">
+    <div class="stat-item"><div class="num">48h</div><div class="lbl">Mise en service</div></div>
+    <div class="stat-item"><div class="num">24/7</div><div class="lbl">Disponibilité de l'agent</div></div>
+    <div class="stat-item"><div class="num">100%</div><div class="lbl">Vos données vous appartiennent</div></div>
+  </div>
+</div>
+
+<section>
+  <div class="inner">
+    <h2 class="section-title reveal">Comment ça fonctionne</h2>
+    <div class="steps">
+      <div class="step reveal"><div class="n">Étape 1</div><h3>Installation en 48h</h3><p>Connexion à votre WhatsApp, votre site ou Instagram — aucune compétence technique requise.</p></div>
+      <div class="step reveal"><div class="n">Étape 2</div><h3>Réponse immédiate</h3><p>L'agent répond et propose des créneaux disponibles directement dans votre agenda.</p></div>
+      <div class="step reveal"><div class="n">Étape 3</div><h3>Le rendez-vous atterrit chez vous</h3><p>Confirmation et rappel automatique — plus aucune absence oubliée.</p></div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="inner">
+    <h2 class="section-title reveal">Pourquoi les professionnels nous font confiance</h2>
+    <div class="steps">
+      <div class="step reveal"><div class="n">01</div><h3>Mise en place rapide</h3><p>Votre agent répond à vos clients dès le 2e jour.</p></div>
+      <div class="step reveal"><div class="n">02</div><h3>Vous restez propriétaire</h3><p>Le compte, les données et l'agent vous appartiennent entièrement.</p></div>
+      <div class="step reveal"><div class="n">03</div><h3>Adapté à votre métier</h3><p>L'agent parle le langage de votre secteur — chantier, patientèle, mandat, consultation.</p></div>
+      <div class="step reveal"><div class="n">04</div><h3>Support humain si besoin</h3><p>Si l'agent ne sait pas répondre, il transmet plutôt que d'inventer.</p></div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--ink2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+  <div class="inner">
+    <h2 class="section-title reveal">Une installation aussi simple que possible</h2>
+    <div class="steps">
+      <div class="step reveal">
+        <div class="n">Option A</div>
+        <h3>Vous avez déjà un site ou une fiche Google ?</h3>
+        <p>On ajoute simplement un bouton "Prendre rendez-vous" sur votre site existant ou votre fiche Google Business — aucune refonte nécessaire, l'agent est actif en 48h sans toucher à ce qui fonctionne déjà.</p>
+      </div>
+      <div class="step reveal">
+        <div class="n">Option B</div>
+        <h3>Pas encore de site web ?</h3>
+        <p>On peut aussi vous créer un site complet, moderne et pensé pour convertir — avec l'agent IA déjà intégré dès la mise en ligne. Une seule interlocution, un seul projet clé en main.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="reveal">
+  <div class="inner" style="display:grid; gap:40px; align-items:center; grid-template-columns:1fr;">
+    <style>
+      @media(min-width:800px){ .trust-grid{grid-template-columns:1.1fr 1fr !important;} }
+    </style>
+    <div class="trust-grid" style="display:grid; gap:40px; align-items:center; grid-template-columns:1fr;">
+      <div>
+        <svg viewBox="0 0 500 400" style="width:100%; height:auto; display:block;">
+          <defs>
+            <radialGradient id="glow" cx="50%" cy="50%" r="50%">
+              <stop offset="0%" stop-color="#00b8ff" stop-opacity="0.55"/>
+              <stop offset="100%" stop-color="#00b8ff" stop-opacity="0"/>
+            </radialGradient>
+          </defs>
+          <rect width="500" height="400" fill="#0b0f1a"/>
+          <g stroke="rgba(0,184,255,0.12)" stroke-width="1">
+            <line x1="0" y1="60" x2="500" y2="60"/><line x1="0" y1="140" x2="500" y2="140"/>
+            <line x1="0" y1="260" x2="500" y2="260"/><line x1="0" y1="340" x2="500" y2="340"/>
+            <line x1="90" y1="0" x2="90" y2="400"/><line x1="250" y1="0" x2="250" y2="400"/><line x1="410" y1="0" x2="410" y2="400"/>
+          </g>
+          <circle cx="250" cy="200" r="90" fill="url(#glow)"/>
+          <circle cx="250" cy="200" r="46" fill="none" stroke="#00b8ff" stroke-width="1.5" opacity="0.8"/>
+          <circle cx="250" cy="200" r="66" fill="none" stroke="#00b8ff" stroke-width="1" opacity="0.4"/>
+          <circle cx="250" cy="200" r="6" fill="#e8eaf0"/>
+          <!-- Main humaine (stylisée, géométrique) -->
+          <g fill="none" stroke="#e8eaf0" stroke-width="6" stroke-linecap="round">
+            <path d="M70 330 L150 260"/>
+            <path d="M150 260 L200 225"/>
+            <path d="M150 260 L170 235 L200 225"/>
+            <path d="M150 260 L165 285 L195 275"/>
+            <path d="M150 260 L145 300 L175 300"/>
+            <path d="M70 330 L60 300 L100 280"/>
+          </g>
+          <!-- Main IA (stylisée, angulaire) -->
+          <g fill="none" stroke="#d4af37" stroke-width="6" stroke-linecap="square">
+            <path d="M430 90 L340 150"/>
+            <path d="M340 150 L300 175"/>
+            <path d="M340 150 L320 130 L300 175"/>
+            <path d="M340 150 L355 120 L330 105"/>
+            <path d="M340 150 L365 165 L340 190"/>
+            <path d="M430 90 L455 70 L420 55"/>
+          </g>
+          <circle cx="200" cy="225" r="4" fill="#00b8ff"/>
+          <circle cx="300" cy="175" r="4" fill="#00b8ff"/>
+        </svg>
+      </div>
+      <div>
+        <h2 class="section-title" style="max-width:16ch;">Travaillez en toute sécurité avec l'IA</h2>
+        <ul style="list-style:none; margin:24px 0 0; padding:0; display:grid; gap:16px; font-family:'Newsreader',serif; font-size:16.5px; color:var(--ink-soft);">
+          <li style="padding-left:20px; position:relative;"><span style="position:absolute; left:0; color:var(--blue);">—</span> Vos données restent les vôtres : aucun accès n'est jamais transféré à un tiers.</li>
+          <li style="padding-left:20px; position:relative;"><span style="position:absolute; left:0; color:var(--blue);">—</span> L'agent ne remplace pas votre équipe, il la soulage des tâches répétitives.</li>
+          <li style="padding-left:20px; position:relative;"><span style="position:absolute; left:0; color:var(--blue);">—</span> Zéro compétence technique requise pour l'utiliser au quotidien.</li>
+          <li style="padding-left:20px; position:relative;"><span style="position:absolute; left:0; color:var(--blue);">—</span> Une IA qui transmet plutôt que d'improviser dès qu'elle n'est pas sûre.</li>
+        </ul>
+        <a href="#offre" class="btn btn-primary" style="margin-top:28px;">Découvrir l'offre</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section style="background:var(--ink2); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
+  <div class="inner">
+    <h2 class="section-title reveal">Questions fréquentes</h2>
+    <div class="reveal">
+      <details class="faq-item"><summary>Combien coûte la mise en place ?</summary><p>L'essai est gratuit pendant 1 mois, sans engagement. Aucun paiement n'est demandé pour commencer.</p></details>
+      <details class="faq-item"><summary>Combien de temps avant que l'agent soit actif ?</summary><p>48h en général, le temps de connecter WhatsApp ou votre site.</p></details>
+      <details class="faq-item"><summary>Est-ce que je reste propriétaire de mes données ?</summary><p>Oui. Tous les accès restent sous vos propres comptes, sans dépendance externe.</p></details>
+      <details class="faq-item"><summary>Que se passe-t-il si l'agent ne sait pas répondre ?</summary><p>Il transmet la demande à votre équipe plutôt que d'improviser.</p></details>
+      <details class="faq-item"><summary>L'agent fonctionne-t-il pour mon secteur ?</summary><p>Santé, droit, immobilier, bâtiment, commerce et services — le vocabulaire s'adapte.</p></details>
+      <details class="faq-item" style="border-bottom:none;"><summary>Comment mes données sont-elles protégées ?</summary><p>Stockage sécurisé, jamais revendues ni partagées.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="offer" id="offre">
+  <div class="inner">
+    <div class="reveal">
+      <h2 class="section-title" style="max-width:18ch;">Choisissez votre formule</h2>
+      <p style="font-family:'Newsreader',serif; color:var(--ink-soft); margin-top:14px; max-width:44ch;">Faites glisser pour comparer — commencez toujours par l'essai gratuit, changez de formule quand vous voulez.</p>
+    </div>
+
+    <div style="position:relative; margin-top:32px;">
+      <div id="pricing-carousel" class="reveal" style="display:flex; gap:20px; overflow-x:auto; scroll-snap-type:x mandatory; padding:6px 6px 16px; -webkit-overflow-scrolling:touch;">
+
+        <div class="price-box" style="flex:0 0 260px; scroll-snap-align:start; display:flex; flex-direction:column;">
+          <div class="amount">Gratuit</div>
+          <div style="color:var(--ink-soft); margin-top:6px; font-size:14px;">1 mois d'essai, sans engagement</div>
+          <ul style="flex:1;">
+            <li>Agent IA configuré pour votre secteur</li>
+            <li>1 canal (WhatsApp, site ou Instagram)</li>
+            <li>Prise de rendez-vous automatique</li>
+            <li>Données hébergées et sécurisées</li>
+            <li>Accès à votre espace client</li>
+          </ul>
+          <button type="button" class="btn btn-primary plan-btn" data-plan="Essai gratuit" style="margin-top:22px; width:100%; border:none; cursor:pointer;">Commencer l'essai</button>
+        </div>
+
+        <div class="price-box" style="flex:0 0 260px; scroll-snap-align:start; display:flex; flex-direction:column;">
+          <div class="amount" style="color:var(--blue);">300€<span style="font-size:15px; color:var(--ink-soft);">/mois HTVA</span></div>
+          <div style="color:var(--ink-soft); margin-top:6px; font-size:14px;">Formule Standard — après votre essai</div>
+          <ul style="flex:1;">
+            <li>Votre agent opérationnel en illimité</li>
+            <li>2 canaux au choix</li>
+            <li>Données hébergées et sécurisées</li>
+            <li>Rapport mensuel d'activité</li>
+            <li>Support par email</li>
+          </ul>
+          <button type="button" class="btn btn-primary plan-btn" data-plan="Standard (300€/mois)" style="margin-top:22px; width:100%; border:none; cursor:pointer;">Choisir Standard</button>
+        </div>
+
+        <div class="price-box" style="flex:0 0 260px; scroll-snap-align:start; display:flex; flex-direction:column;">
+          <div class="amount" style="color:var(--gold);">500€<span style="font-size:15px; color:var(--ink-soft);">/mois HTVA</span></div>
+          <div style="color:var(--ink-soft); margin-top:6px; font-size:14px;">Formule Premium — métiers à fort volume</div>
+          <ul style="flex:1;">
+            <li>Les 3 canaux (WhatsApp + site + Instagram)</li>
+            <li>Données hébergées et sécurisées</li>
+            <li>Support prioritaire</li>
+            <li>Ajustements du prompt sur demande</li>
+            <li>Rapport hebdomadaire d'activité</li>
+          </ul>
+          <button type="button" class="btn btn-primary plan-btn" data-plan="Premium (500€/mois)" style="margin-top:22px; width:100%; border:none; cursor:pointer;">Choisir Premium</button>
+        </div>
+
+      </div>
+      <div style="display:flex; gap:10px; margin-top:8px;">
+        <button type="button" id="carousel-prev" aria-label="Précédent" style="background:none; border:1px solid var(--line); color:var(--paper); width:36px; height:36px; cursor:pointer;">←</button>
+        <button type="button" id="carousel-next" aria-label="Suivant" style="background:none; border:1px solid var(--line); color:var(--paper); width:36px; height:36px; cursor:pointer;">→</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section id="inscription">
+  <div class="inner reveal">
+    <h2 class="section-title">Réservez votre essai gratuit</h2>
+    <p style="font-family:'Newsreader',serif; color:var(--ink-soft); margin-top:10px;">2 minutes pour tout configurer.</p>
+    <button type="button" id="show-form-btn" class="btn btn-primary" style="margin-top:24px;">Commencer mon inscription</button>
+    <form id="lead-form" style="display:none;">
+      <input type="hidden" name="formule" id="formule-field" value="Essai gratuit">
+      <input required name="prenom" placeholder="Votre prénom">
+      <input required name="entreprise" placeholder="Nom de votre entreprise">
+      <input required type="email" name="email" placeholder="Votre adresse email">
+      <input name="telephone" placeholder="Téléphone (optionnel)">
+      <select required name="secteur">
+        <option value="">Votre secteur d'activité</option>
+        <option>Dentiste</option><option>Avocat</option><option>Agence immobilière</option>
+        <option>Coach</option><option>Salon de beauté / coiffure</option><option>Garage / carrosserie</option>
+        <option>Restaurant</option><option>Kinésithérapeute</option><option>Comptable</option>
+        <option>Plombier</option><option>Électricien</option><option>Menuisier</option>
+        <option>Maçon / gros œuvre</option><option>Peintre en bâtiment</option><option>Couvreur / toiture</option>
+        <option>Chauffagiste</option><option>Carreleur</option><option>Architecte</option>
+        <option>Entrepreneur général / construction</option><option>Paysagiste / jardinier</option>
+        <option>Serrurier</option><option>Vitrier</option><option>Agence de location</option><option>Autre</option>
+      </select>
+      <input name="horaires" placeholder="Horaires d'ouverture (optionnel)">
+      <textarea name="services" rows="3" placeholder="Vos services les plus demandés (optionnel)"></textarea>
+      <button type="submit" id="lead-submit" class="btn btn-dark">Envoyer ma demande</button>
+      <div id="lead-status"></div>
+    </form>
+  </div>
+</section>
+
+<footer>© 2026 — Agent IA de prise de rendez-vous.</footer>
+
+<div id="com-launcher" style="position:fixed; bottom:20px; right:20px; z-index:50;">
+  <button id="com-toggle" style="background:var(--gold); color:#1a1404; border:none; width:56px; height:56px; border-radius:50%; font-size:22px; cursor:pointer; box-shadow:0 0 20px rgba(212,175,55,0.4);">💬</button>
+</div>
+<div id="com-panel" style="display:none; position:fixed; bottom:84px; right:20px; width:min(340px,90vw); max-height:60vh; background:var(--ink2); border:1px solid var(--line); z-index:50; flex-direction:column;">
+  <div style="padding:14px 16px; border-bottom:1px solid var(--line);">
+    <div style="font-weight:600; color:var(--paper);">Conseiller commercial</div>
+    <div style="font-size:12px; color:var(--paper-dim); margin-top:2px;">Questions sur l'offre, le prix, la mise en place.</div>
+  </div>
+  <div id="com-log" style="flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:12px; font-size:15px; min-height:0;"></div>
+  <div style="display:flex; gap:8px; border-top:1px solid var(--line); padding:10px 12px;">
+    <input id="com-input" placeholder="Posez votre question…" style="flex:1; background:rgba(232,234,240,0.06); border:1px solid var(--line); color:var(--paper); padding:10px 12px; font-family:inherit;">
+    <button id="com-send" style="background:var(--blue); border:none; color:#05070d; font-weight:600; padding:10px 16px; cursor:pointer;">Envoyer</button>
+  </div>
+</div>
+<div id="demo-panel" style="display:none; position:fixed; bottom:20px; left:20px; width:min(340px,90vw); max-height:60vh; background:var(--ink2); border:1px solid var(--blue); z-index:51; flex-direction:column;">
+  <div style="padding:14px 16px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between;">
+    <div>
+      <div style="font-weight:600; color:var(--paper);">Démo en direct</div>
+      <div style="font-size:12px; color:var(--paper-dim);">Cabinet fictif "Cabinet Dupont"</div>
+    </div>
+    <button id="demo-close" style="background:none; border:none; color:var(--paper-dim); font-size:18px; cursor:pointer;">✕</button>
+  </div>
+  <div id="demo-log" style="flex:1; overflow-y:auto; padding:14px 16px; display:flex; flex-direction:column; gap:12px; font-size:15px; min-height:0;"></div>
+  <div style="display:flex; gap:8px; border-top:1px solid var(--line); padding:10px 12px;">
+    <input id="demo-input" placeholder="Ex: un créneau demain ?" style="flex:1; background:rgba(232,234,240,0.06); border:1px solid var(--line); color:var(--paper); padding:10px 12px; font-family:inherit;">
+    <button id="demo-send" style="background:var(--blue); border:none; color:#05070d; font-weight:600; padding:10px 16px; cursor:pointer;">Envoyer</button>
+  </div>
+</div>
+
+<script>
+// ============ CONFIGURATION SUPABASE — à remplacer par tes vraies valeurs ============
+const SUPABASE_URL = "https://anofluwpjikmqqxmpawn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub2ZsdXdwamlrbXFxeG1wYXduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1OTQ4NDQsImV4cCI6MjEwNjE3MDg0NH0.LdYj-YNw6jRPtuP__GbYXMQWlIAEEu2w9s9llDhLnn0";
+const supabase = window.supabase ? window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY) : null;
+
+// ============ FORMULAIRE REPLIÉ PAR DÉFAUT, RÉVÉLÉ AU CLIC ============
+(function(){
+  var showBtn = document.getElementById('show-form-btn');
+  var form = document.getElementById('lead-form');
+  function openForm(planLabel){
+    if(planLabel) document.getElementById('formule-field').value = planLabel;
+    document.getElementById('inscription').scrollIntoView({ behavior:'smooth' });
+    form.style.display = 'grid';
+    showBtn.style.display = 'none';
+    setTimeout(function(){ form.querySelector('input')?.focus(); }, 400);
+  }
+  showBtn.addEventListener('click', function(){ openForm(); });
+  document.querySelectorAll('a[href="#inscription"]').forEach(function(a){
+    a.addEventListener('click', function(){ setTimeout(function(){ openForm(); }, 400); });
+  });
+  // Boutons de chaque formule du carrousel
+  document.querySelectorAll('.plan-btn').forEach(function(btn){
+    btn.addEventListener('click', function(){ openForm(btn.getAttribute('data-plan')); });
+  });
+  // Flèches du carrousel
+  var carousel = document.getElementById('pricing-carousel');
+  var prevBtn = document.getElementById('carousel-prev');
+  var nextBtn = document.getElementById('carousel-next');
+  if(carousel && prevBtn && nextBtn){
+    prevBtn.addEventListener('click', function(){ carousel.scrollBy({ left:-280, behavior:'smooth' }); });
+    nextBtn.addEventListener('click', function(){ carousel.scrollBy({ left:280, behavior:'smooth' }); });
+  }
+})();
+
+// ============ SUIVI DES CLICS (pour le dashboard) ============
+(function(){
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('a, button');
+    if(!el) return;
+    var label = (el.textContent || el.id || 'élément').trim().slice(0,80);
+    supabase.from('page_clicks').insert([{ page:'index', element_label: label, element_id: el.id || null }]).then(function(){});
+  });
+})();
+const leadForm = document.getElementById('lead-form');
+leadForm.addEventListener('submit', async function(e){
+  e.preventDefault();
+  const statusEl = document.getElementById('lead-status');
+  const btn = document.getElementById('lead-submit');
+  const data = Object.fromEntries(new FormData(leadForm).entries());
+  btn.disabled = true; btn.textContent = 'Envoi en cours…';
+  const { error } = await supabase.from('clients').insert([{
+    prenom: data.prenom, entreprise: data.entreprise, email: data.email,
+    telephone: data.telephone, secteur: data.secteur, horaires: data.horaires,
+    services: data.services, formule: data.formule, statut: 'nouveau'
+  }]);
+  if (error) {
+    statusEl.textContent = error.message.includes('duplicate') ? "Cet email est déjà inscrit — connectez-vous à votre espace client." : "Erreur : " + error.message;
+    btn.disabled = false; btn.textContent = 'Envoyer ma demande';
+  } else {
+    statusEl.textContent = "Merci ! Créez votre mot de passe pour accéder à votre espace client.";
+    setTimeout(()=>{ window.location.href = 'login.html?email=' + encodeURIComponent(data.email); }, 1500);
+  }
+});
+
+// ============ ANIMATION IA EN FOND DU HERO (réseau de particules, pas une vidéo) ============
+(function(){
+ try{
+  var canvas = document.getElementById('ai-hero-canvas');
+  var wrap = document.getElementById('ai-hero-canvas-wrap');
+  if(!canvas) return;
+  var ctx = canvas.getContext('2d');
+  var reduceMotion = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var w,h;
+  function resize(){ w = canvas.width = canvas.offsetWidth; h = canvas.height = canvas.offsetHeight; }
+  resize(); window.addEventListener('resize', resize);
+
+  var NODE_COUNT = 60, nodes = [];
+  for(var i=0;i<NODE_COUNT;i++){
+    var angle = Math.random()*Math.PI*2;
+    var r = Math.pow(Math.random(),0.5);
+    nodes.push({ baseX:0.5+Math.cos(angle)*0.26*r, baseY:0.42+Math.sin(angle)*0.32*r, phase:Math.random()*Math.PI*2, speed:0.4+Math.random()*0.6 });
+  }
+  var t = 0;
+  function draw(){
+    try{
+      t += 0.01;
+      ctx.clearRect(0,0,w,h);
+      var pts = nodes.map(function(n){
+        return { x:(n.baseX+Math.sin(t*n.speed+n.phase)*0.012)*w, y:(n.baseY+Math.cos(t*n.speed+n.phase)*0.012)*h };
+      });
+      ctx.lineWidth = 1;
+      for(var i=0;i<pts.length;i++){
+        for(var j=i+1;j<pts.length;j++){
+          var dx=pts[i].x-pts[j].x, dy=pts[i].y-pts[j].y, d=Math.sqrt(dx*dx+dy*dy);
+          if(d < w*0.1){
+            ctx.strokeStyle = 'rgba(0,184,255,' + (0.22*(1-d/(w*0.1))) + ')';
+            ctx.beginPath(); ctx.moveTo(pts[i].x,pts[i].y); ctx.lineTo(pts[j].x,pts[j].y); ctx.stroke();
+          }
+        }
+      }
+      pts.forEach(function(p){ ctx.fillStyle='rgba(0,184,255,0.6)'; ctx.beginPath(); ctx.arc(p.x,p.y,1.6,0,Math.PI*2); ctx.fill(); });
+      if(!reduceMotion) requestAnimationFrame(draw);
+    } catch(e){ /* animation silencieuse en cas d'erreur, ne bloque rien */ }
+  }
+  draw();
+
+  window.addEventListener('scroll', function(){
+    var fade = Math.max(0, 1 - window.scrollY/280);
+    wrap.style.opacity = fade;
+  });
+ } catch(e){ /* si le canvas échoue, le hero reste visible normalement sans animation */ }
+})();
+
+// ============ APPARITION DES ÉLÉMENTS AU SCROLL (avec filet de sécurité) ============
+(function(){
+  try{
+    var items = document.querySelectorAll('.reveal');
+    if(!items.length || !('IntersectionObserver' in window)) return; // reste visible par défaut, rien à faire
+    document.documentElement.classList.add('reveal-ready');
+    var obs = new IntersectionObserver(function(entries){
+      entries.forEach(function(e){ if(e.isIntersecting){ e.target.classList.add('in-view'); obs.unobserve(e.target); } });
+    }, { threshold:0.1 });
+    items.forEach(function(el){ obs.observe(el); });
+    // Filet de sécurité : si un élément n'est jamais détecté (bug d'affichage), il redevient visible après 4s
+    setTimeout(function(){ items.forEach(function(el){ el.classList.add('in-view'); }); }, 4000);
+  } catch(e){
+    document.documentElement.classList.remove('reveal-ready'); // en cas d'erreur, tout redevient visible sans condition
+  }
+})();
+
+// ============ AGENTS IA ============
+(function(){
+  var SECTOR_KEYWORDS = {
+    "dentiste": /dentist|dentaire/i, "avocat": /avocat|cabinet juridique/i, "agence immobilière": /immobil/i,
+    "coach": /coach/i, "salon de beauté / coiffure": /salon|coiffure|esth[ée]tique/i,
+    "garage / carrosserie": /garage|carross/i, "restaurant": /restaurant|traiteur/i,
+    "kinésithérapeute": /kin[ée]|physioth[ée]rap/i, "comptable": /comptable/i, "plombier": /plomb/i,
+    "électricien": /[ée]lectricien|[ée]lectricit[ée]/i, "menuisier": /menuisier|menuiserie/i,
+    "maçon / gros œuvre": /ma[çc]on|gros [œo]uvre/i, "peintre en bâtiment": /peintre/i,
+    "couvreur / toiture": /couvreur|toiture|charpent/i, "chauffagiste": /chauffagiste|chaudi[èe]re/i,
+    "carreleur": /carreleur|carrelage/i, "architecte": /architecte/i,
+    "entrepreneur général / construction": /entrepreneur g[ée]n[ée]ral|construction|b[âa]timent|r[ée]novation/i,
+    "paysagiste / jardinier": /paysagiste|jardinier|jardinage/i, "serrurier": /serrurier|serrurerie/i,
+    "vitrier": /vitrier/i, "agence de location": /location de |agence de location|loueur/i
+  };
+  function detectSector(text){ for (var k in SECTOR_KEYWORDS){ if (SECTOR_KEYWORDS[k].test(text)) return k; } return null; }
+
+  var SYSTEM_DEMO = "Tu es l'agent IA DEMO de prise de rendez-vous. Tu reponds UNIQUEMENT sur un cabinet fictif 'Cabinet Dupont' et geres exclusivement la prise de rendez-vous - jamais d'argumentaire commercial. SCENARIO STRICT : ETAPE 1 (premiere demande, quel que soit le creneau) : refuse ce creneau, propose 2 alternatives (horaires lun-ven 9h-18h, sam 9h-13h, ferme dimanche). ETAPE 2 (creneau alternatif confirme) : AVANT de confirmer definitivement, demande OBLIGATOIREMENT, si ce n'est pas deja donne : (a) le nom et le numero de telephone du visiteur, en expliquant que c'est necessaire pour le prevenir en cas de changement du cote du prestataire, et (b) le motif/objet du rendez-vous. Le motif DOIT etre coherent avec le secteur d'activite identifie ou mentionne (ex: 'detartrage' ou 'controle' pour un dentiste, 'visite de bien' pour l'immobilier, 'devis' ou 'intervention' pour un artisan du batiment, 'consultation' pour un avocat) - si le visiteur donne un motif qui n'a manifestement rien a voir avec le metier du prestataire (ex: une 'visite de maison' demandee chez un dentiste), signale-le poliment et redemande un motif coherent avec ce metier, sans donner d'exemples. Une fois nom, telephone et motif coherent obtenus, confirme le rendez-vous et retiens toutes ces infos (nom, telephone, motif, creneau). ETAPE 3 (changement demande plus tard) : un creneau a heure paire pile (10h,12h,14h,16h,18h) est indisponible, sinon disponible ; si dispo, remplace l'ancien RDV et annonce-le ; si indispo, annonce-le et demande si le visiteur garde son RDV initial. A la fin de l'echange, si le visiteur semble convaincu, suggere-lui SUBTILEMENT mais clairement de discuter de l'offre avec le conseiller commercial (bulle de chat en bas a droite du site) pour en savoir plus. Adapte le vocabulaire au secteur mentionne. Reponses courtes (3-4 phrases).";
+
+  function systemCommercial(sector, fromDemo){
+    var secteurTxt = sector ? ("Le visiteur travaille dans le secteur : " + sector + ". Utilise le jargon propre a ce metier.") : "Secteur inconnu - demande-le naturellement.";
+    var intro = fromDemo ? "Le visiteur arrive depuis l'agent demo. Demande-lui d'abord s'il a des questions sur ce qu'il vient de tester, puis enchaine vers la vente. " : "";
+    return "Tu es l'agent COMMERCIAL IA. " + intro + secteurTxt + " Objectif PRIORITAIRE : vendre le service (rassurer, lever les objections : fiabilite, mise en place 48h, confidentialite). Argument cle sur la simplicite : si le visiteur a deja un site ou une fiche Google, on ajoute juste un bouton de prise de rendez-vous sans rien refaire ; s'il n'a pas de site, on peut aussi lui creer un site complet avec l'agent deja integre. Offre actuelle : essai GRATUIT d'1 mois, sans engagement, 3 places disponibles ce mois-ci. Objectif SECONDAIRE : recueillir les informations du visiteur via le formulaire d'inscription (section 'Reservez votre essai gratuit' sur cette page) des qu'un interet reel apparait - jamais demander email/telephone directement dans le chat. Vouvoiement systematique, registre professionnel. Reponses courtes (3-4 phrases), toujours une question ou un CTA a la fin.";
+  }
+
+  function addBubble(log, role, text){
+    var b = document.createElement('div');
+    b.style.cssText = 'max-width:85%;padding:9px 12px;border-radius:2px;line-height:1.4;'+(role==='user'?'align-self:flex-end;background:var(--blue);color:#05070d;':'align-self:flex-start;background:rgba(232,234,240,0.08);color:var(--paper);');
+    b.textContent = text; log.appendChild(b); log.scrollTop = log.scrollHeight; return b;
+  }
+
+  async function callAgent(systemPrompt, history){
+    var messages = [{ role: 'user', content: systemPrompt + "\n\nHistorique:\n" + history.map(function(m){return (m.role==='user'?'Visiteur: ':'Agent: ')+m.content;}).join('\n') }];
+    var res = await fetch(SUPABASE_URL + "/functions/v1/chat-agent", {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'Authorization': 'Bearer ' + SUPABASE_ANON_KEY },
+      body: JSON.stringify({ messages: messages })
+    });
+    var data = await res.json();
+    return data.text;
+  }
+
+  function makeChatController(opts){
+    var log = document.getElementById(opts.logId), input = document.getElementById(opts.inputId), send = document.getElementById(opts.sendId);
+    var history = [], sector = null, greeted = false;
+    function open(){ if(!greeted){ addBubble(log,'bot', typeof opts.greeting==='function'?opts.greeting():opts.greeting); greeted=true; } }
+    async function handleSend(){
+      var text = input.value.trim(); if(!text) return;
+      addBubble(log,'user',text); history.push({role:'user',content:text}); input.value='';
+      if(typeof opts.onSend === 'function') opts.onSend();
+      var det = detectSector(text); if(det) sector = det;
+      var thinking = addBubble(log,'bot','Un instant…');
+      try{
+        var activeSystem = opts.getSystem(sector);
+        var replyText = await callAgent(activeSystem, history);
+        thinking.textContent = replyText; history.push({role:'assistant',content:replyText});
+      }catch(e){ thinking.textContent = "Erreur, réessayez."; }
+    }
+    send.addEventListener('click', handleSend);
+    input.addEventListener('keydown', function(e){ if(e.key==='Enter') handleSend(); });
+    return { open: open };
+  }
+
+  var comChat = makeChatController({ logId:'com-log', inputId:'com-input', sendId:'com-send',
+    greeting: "Bonjour, je suis à votre disposition pour vous présenter notre solution. Que souhaitez-vous savoir ?",
+    getSystem: function(sector){ return systemCommercial(sector, window.__fromDemo); } });
+  var demoTurns = 0;
+  var demoChat = makeChatController({ logId:'demo-log', inputId:'demo-input', sendId:'demo-send',
+    greeting: "Bonjour ! Ceci est une démo sur un cabinet fictif. Essayez : \"avez-vous un créneau demain ?\"",
+    getSystem: function(){ return SYSTEM_DEMO; },
+    onSend: function(){
+      demoTurns++;
+      if(demoTurns === 3){
+        setTimeout(function(){
+          var log = document.getElementById('demo-log');
+          var note = document.createElement('div');
+          note.style.cssText = 'align-self:center; font-size:12px; color:var(--gold); font-style:italic; text-align:center; padding:4px 0;';
+          note.textContent = "💬 Une question sur l'offre ? Notre conseiller commercial est disponible en bas à droite.";
+          log.appendChild(note); log.scrollTop = log.scrollHeight;
+          window.__fromDemo = true;
+        }, 600);
+      }
+    } });
+
+  document.getElementById('com-toggle').addEventListener('click', function(){
+    var p = document.getElementById('com-panel'); var open = p.style.display==='flex';
+    p.style.display = open?'none':'flex'; if(!open) comChat.open();
+  });
+  var demoPanel = document.getElementById('demo-panel');
+  document.getElementById('test-agent-btn').addEventListener('click', function(e){ e.preventDefault(); demoPanel.style.display='flex'; demoChat.open(); });
+  document.getElementById('demo-close').addEventListener('click', function(){ demoPanel.style.display='none'; });
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mon espace client</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#05070d; --ink2:#0b0f1a; --paper:#e8eaf0; --paper-dim:#7b8394;
+    --blue:#00b8ff; --gold:#d4af37; --line:rgba(232,234,240,0.12); --ink-soft:#a8adba;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--paper); font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.5;}
+  nav{position:sticky; top:0; z-index:10; background:rgba(5,7,13,0.85); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:16px 24px; display:flex; justify-content:space-between; align-items:center;}
+  nav .brand{font-weight:600; color:var(--blue); letter-spacing:.02em;}
+  nav .menu{display:flex; gap:20px; font-size:14px;}
+  nav a{color:var(--paper); text-decoration:none; opacity:.8;}
+  nav a:hover{opacity:1; color:var(--blue);}
+  .wrap{max-width:760px; margin:0 auto; padding:40px 24px 80px;}
+  h1{font-size:28px; margin-bottom:4px; font-weight:600; letter-spacing:-0.01em;}
+  .sub{color:var(--paper-dim); font-family:'Newsreader',serif; font-size:16px; margin-bottom:36px;}
+  .card{border:1px solid var(--line); background:var(--ink2); padding:24px; margin-bottom:24px;}
+  .card h2{font-size:14px; margin-bottom:16px; text-transform:uppercase; letter-spacing:.05em; color:var(--paper-dim);}
+  .grid{display:grid; gap:14px;}
+  @media(min-width:600px){ .grid{grid-template-columns:1fr 1fr;} }
+  label{font-size:12px; color:var(--paper-dim); display:block; margin-bottom:4px;}
+  input, select, textarea{width:100%; padding:11px 12px; border:1px solid var(--line); background:rgba(232,234,240,0.03); color:var(--paper); font-family:inherit; font-size:14.5px;}
+  select option{background:var(--ink2); color:var(--paper);}
+  .status-badge{display:inline-block; padding:4px 12px; background:rgba(212,175,55,0.12); border:1px solid rgba(212,175,55,0.35); color:var(--gold); font-size:13px; margin-bottom:8px;}
+  .info-list{list-style:none; padding:0; margin:0; display:grid; gap:12px; font-family:'Newsreader',serif; font-size:16px; color:var(--ink-soft);}
+  .info-list li{padding-left:16px; position:relative;}
+  .info-list li::before{content:"—"; position:absolute; left:0; color:var(--blue);}
+  button{padding:13px 22px; background:var(--gold); color:#1a1404; border:none; border-radius:2px; font-weight:600; font-size:14.5px; cursor:pointer; margin-top:16px; box-shadow:0 0 24px rgba(212,175,55,0.25);}
+  #save-status{font-size:13px; color:var(--paper-dim); margin-top:8px;}
+  #loading, #not-logged{padding:60px 24px; text-align:center; color:var(--paper-dim);}
+</style>
+</head>
+<body>
+<nav>
+  <div class="brand">Agent IA</div>
+  <div class="menu">
+    <a href="index.html">← Accueil</a>
+    <a href="#" id="logout-link">Déconnexion</a>
+  </div>
+</nav>
+
+<div id="loading">Chargement de votre espace…</div>
+<div id="not-logged" style="display:none;">Vous n'êtes pas connecté. <a href="login.html" style="color:var(--blue);">Se connecter</a></div>
+
+<div class="wrap" id="content" style="display:none;">
+  <h1>Bonjour <span id="prenom-display"></span></h1>
+  <div class="sub">Voici la vue d'ensemble de votre agent IA.</div>
+
+  <div class="card">
+    <h2>Statut de votre agent</h2>
+    <div class="status-badge" id="statut-badge">—</div>
+    <ul class="info-list">
+      <li>Votre agent est configuré pour le secteur : <strong id="secteur-display"></strong></li>
+      <li>Il répond automatiquement 24h/24 sur les canaux connectés (WhatsApp, site, Instagram)</li>
+      <li>Chaque rendez-vous pris est confirmé au client puis rappelé automatiquement 24h avant</li>
+      <li>Support disponible par email à tout moment pendant votre période d'essai</li>
+    </ul>
+  </div>
+
+  <div class="card">
+    <h2>Vos informations (modifiables)</h2>
+    <form id="profile-form">
+      <div class="grid">
+        <div><label>Prénom</label><input name="prenom"></div>
+        <div><label>Entreprise</label><input name="entreprise"></div>
+        <div><label>Téléphone</label><input name="telephone"></div>
+        <div>
+          <label>Secteur d'activité</label>
+          <select name="secteur">
+            <option>Dentiste</option><option>Avocat</option><option>Agence immobilière</option>
+            <option>Coach</option><option>Salon de beauté / coiffure</option><option>Garage / carrosserie</option>
+            <option>Restaurant</option><option>Kinésithérapeute</option><option>Comptable</option>
+            <option>Plombier</option><option>Électricien</option><option>Menuisier</option>
+            <option>Maçon / gros œuvre</option><option>Peintre en bâtiment</option><option>Couvreur / toiture</option>
+            <option>Chauffagiste</option><option>Carreleur</option><option>Architecte</option>
+            <option>Entrepreneur général / construction</option><option>Paysagiste / jardinier</option>
+            <option>Serrurier</option><option>Vitrier</option><option>Agence de location</option><option>Autre</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:14px;"><label>Horaires d'ouverture</label><input name="horaires"></div>
+      <div style="margin-top:14px;"><label>Services les plus demandés</label><textarea name="services" rows="3"></textarea></div>
+      <button type="submit">Enregistrer les modifications</button>
+      <div id="save-status"></div>
+    </form>
+  </div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://anofluwpjikmqqxmpawn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub2ZsdXdwamlrbXFxeG1wYXduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1OTQ4NDQsImV4cCI6MjEwNjE3MDg0NH0.LdYj-YNw6jRPtuP__GbYXMQWlIAEEu2w9s9llDhLnn0";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+let currentUser = null;
+
+// ============ SUIVI DES CLICS (pour le dashboard) ============
+(function(){
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('a, button');
+    if(!el) return;
+    var label = (el.textContent || el.id || 'élément').trim().slice(0,80);
+    supabase.from('page_clicks').insert([{ page:'membre', element_label: label, element_id: el.id || null }]).then(function(){});
+  });
+})();
+
+async function init(){
+  const { data: { user } } = await supabase.auth.getUser();
+  document.getElementById('loading').style.display = 'none';
+  if(!user){ document.getElementById('not-logged').style.display = 'block'; return; }
+  currentUser = user;
+
+  const { data: rows, error } = await supabase.from('clients').select('*').eq('user_id', user.id).limit(1);
+  if(error || !rows || !rows.length){
+    document.getElementById('not-logged').innerHTML = "Aucune fiche trouvée pour ce compte. <a href='index.html' style='color:#00b8ff;'>Retour à l'accueil</a>";
+    document.getElementById('not-logged').style.display = 'block';
+    return;
+  }
+  const client = rows[0];
+  document.getElementById('content').style.display = 'block';
+  document.getElementById('prenom-display').textContent = client.prenom || '';
+  document.getElementById('secteur-display').textContent = client.secteur || 'non renseigné';
+  document.getElementById('statut-badge').textContent = client.statut === 'essai' ? 'Période d\'essai en cours' : (client.statut === 'client_payant' ? 'Client actif' : 'Nouveau');
+
+  const form = document.getElementById('profile-form');
+  form.prenom.value = client.prenom || '';
+  form.entreprise.value = client.entreprise || '';
+  form.telephone.value = client.telephone || '';
+  form.secteur.value = client.secteur || '';
+  form.horaires.value = client.horaires || '';
+  form.services.value = client.services || '';
+
+  form.addEventListener('submit', async function(e){
+    e.preventDefault();
+    const statusEl = document.getElementById('save-status');
+    statusEl.textContent = 'Enregistrement…';
+    const updates = Object.fromEntries(new FormData(form).entries());
+    const { error } = await supabase.from('clients').update(updates).eq('user_id', currentUser.id);
+    statusEl.textContent = error ? "Erreur : " + error.message : "Modifications enregistrées.";
+    if(!error) document.getElementById('secteur-display').textContent = updates.secteur;
+  });
+}
+init();
+
+document.getElementById('logout-link').addEventListener('click', async function(e){
+  e.preventDefault();
+  await supabase.auth.signOut();
+  window.location.href = 'login.html';
+});
+</script>
+</body>
+</html>

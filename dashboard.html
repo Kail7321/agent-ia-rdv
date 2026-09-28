@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Dashboard — Suivi des visiteurs</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#05070d; --ink2:#0b0f1a; --paper:#e8eaf0; --paper-dim:#7b8394;
+    --blue:#00b8ff; --gold:#d4af37; --line:rgba(232,234,240,0.12); --ink-soft:#a8adba;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--paper); font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.5;}
+  nav{position:sticky; top:0; z-index:10; background:rgba(5,7,13,0.85); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:16px 24px; display:flex; justify-content:space-between; align-items:center;}
+  nav .brand{font-weight:600; color:var(--blue); letter-spacing:.02em;}
+  nav a{color:var(--paper); text-decoration:none; font-size:14px; opacity:.8;}
+  nav a:hover{opacity:1; color:var(--blue);}
+  .wrap{max-width:900px; margin:0 auto; padding:36px 24px 70px;}
+  h1{font-size:26px; margin-bottom:24px; font-weight:600; letter-spacing:-0.01em;}
+  .kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:32px;}
+  .kpi{border:1px solid var(--line); padding:16px; background:var(--ink2);}
+  .kpi .label{font-size:12px; color:var(--paper-dim); text-transform:uppercase; letter-spacing:.03em;}
+  .kpi .value{font-size:26px; color:var(--gold); margin-top:6px; font-weight:600;}
+  table{width:100%; border-collapse:collapse; font-size:14px;}
+  th,td{text-align:left; padding:10px; border-bottom:1px solid var(--line);}
+  th{color:var(--paper-dim); font-size:12px; text-transform:uppercase; letter-spacing:.03em;}
+  #not-logged{padding:60px 24px; text-align:center; color:var(--paper-dim); font-family:'Newsreader',serif; font-size:16px;}
+  #not-logged a{color:var(--blue);}
+</style>
+</head>
+<body>
+<nav><div class="brand">Agent IA — Dashboard</div><a href="index.html">← Accueil</a></nav>
+<div id="loading" style="padding:60px; text-align:center; color:#7b8394; font-family:'Newsreader',serif;">Chargement…</div>
+<div id="not-logged" style="display:none;">Accès réservé. <a href="login.html">Se connecter</a></div>
+<div class="wrap" id="content" style="display:none;">
+  <h1>Où cliquent vos visiteurs</h1>
+  <div class="kpis">
+    <div class="kpi"><div class="label">Clics au total</div><div class="value" id="total-clicks">—</div></div>
+    <div class="kpi"><div class="label">Élément le plus cliqué</div><div class="value" id="top-element" style="font-size:16px;">—</div></div>
+    <div class="kpi"><div class="label">Aujourd'hui</div><div class="value" id="today-clicks">—</div></div>
+  </div>
+  <table>
+    <thead><tr><th>Élément cliqué</th><th>Nombre de clics</th></tr></thead>
+    <tbody id="clicks-table"></tbody>
+  </table>
+</div>
+
+<script>
+const SUPABASE_URL = "https://anofluwpjikmqqxmpawn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub2ZsdXdwamlrbXFxeG1wYXduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1OTQ4NDQsImV4cCI6MjEwNjE3MDg0NH0.LdYj-YNw6jRPtuP__GbYXMQWlIAEEu2w9s9llDhLnn0";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============ SUIVI DES CLICS (pour le dashboard) ============
+(function(){
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('a, button');
+    if(!el) return;
+    var label = (el.textContent || el.id || 'élément').trim().slice(0,80);
+    supabase.from('page_clicks').insert([{ page:'dashboard', element_label: label, element_id: el.id || null }]).then(function(){});
+  });
+})();
+
+async function init(){
+  const { data: { user } } = await supabase.auth.getUser();
+  document.getElementById('loading').style.display = 'none';
+  if(!user){ document.getElementById('not-logged').style.display = 'block'; return; }
+
+  const { data: clicks, error } = await supabase.from('page_clicks').select('*').order('created_at', { ascending: false }).limit(2000);
+  document.getElementById('content').style.display = 'block';
+  if(error || !clicks){ document.getElementById('clicks-table').innerHTML = '<tr><td colspan="2">Aucune donnée pour le moment.</td></tr>'; return; }
+
+  document.getElementById('total-clicks').textContent = clicks.length;
+  var today = new Date().toISOString().slice(0,10);
+  document.getElementById('today-clicks').textContent = clicks.filter(c => c.created_at.slice(0,10) === today).length;
+
+  var counts = {};
+  clicks.forEach(c => { var k = c.element_label || 'Sans nom'; counts[k] = (counts[k]||0) + 1; });
+  var sorted = Object.entries(counts).sort((a,b) => b[1]-a[1]);
+  document.getElementById('top-element').textContent = sorted.length ? sorted[0][0] : '—';
+
+  var tbody = document.getElementById('clicks-table');
+  tbody.innerHTML = sorted.map(([label,count]) => '<tr><td>'+label+'</td><td>'+count+'</td></tr>').join('') || '<tr><td colspan="2">Aucun clic enregistré pour le moment.</td></tr>';
+}
+init();
+</script>
+</body>
+</html>

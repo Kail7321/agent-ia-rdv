@@ -1,0 +1,100 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Espace client — Connexion</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Newsreader:ital,opsz,wght@0,6..72,400;0,6..72,500;1,6..72,400&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --ink:#05070d; --ink2:#0b0f1a; --paper:#e8eaf0; --paper-dim:#7b8394;
+    --blue:#00b8ff; --gold:#d4af37; --line:rgba(232,234,240,0.12); --ink-soft:#a8adba;
+  }
+  *{box-sizing:border-box;}
+  body{margin:0; background:var(--ink); color:var(--paper); font-family:'Bricolage Grotesque',system-ui,sans-serif; line-height:1.5;}
+  nav{position:sticky; top:0; z-index:10; background:rgba(5,7,13,0.85); backdrop-filter:blur(10px); border-bottom:1px solid var(--line); padding:16px 24px; display:flex; justify-content:space-between; align-items:center;}
+  nav .brand{font-weight:600; color:var(--blue); letter-spacing:.02em;}
+  nav a{color:var(--paper); text-decoration:none; font-size:14px; opacity:.8;}
+  nav a:hover{opacity:1; color:var(--blue);}
+  .wrap{max-width:380px; margin:80px auto; padding:0 24px;}
+  h1{font-size:28px; margin-bottom:8px; font-weight:600; letter-spacing:-0.01em;}
+  p.sub{color:var(--paper-dim); font-family:'Newsreader',serif; font-size:16px; margin-bottom:28px;}
+  input{width:100%; padding:13px 14px; margin-bottom:12px; border:1px solid var(--line); background:rgba(232,234,240,0.03); color:var(--paper); font-family:inherit; font-size:15px;}
+  input::placeholder{color:var(--paper-dim);}
+  button{width:100%; padding:14px; background:var(--gold); color:#1a1404; border:none; border-radius:2px; font-weight:600; font-size:15px; cursor:pointer; margin-top:6px; box-shadow:0 0 24px rgba(212,175,55,0.25);}
+  .toggle{margin-top:18px; font-size:14px; text-align:center; color:var(--paper-dim);}
+  .toggle a{color:var(--blue); cursor:pointer; text-decoration:underline;}
+  #status{margin-top:14px; font-size:14px; color:var(--paper-dim);}
+  .back{margin-top:24px; font-size:14px;}
+  .back a{color:var(--paper-dim); text-decoration:none;}
+  .back a:hover{color:var(--blue);}
+</style>
+</head>
+<body>
+<nav><div class="brand">Agent IA</div><a href="index.html">← Retour à l'accueil</a></nav>
+<div class="wrap">
+  <h1 id="title">Connexion</h1>
+  <p class="sub" id="subtitle">Accédez à votre espace client.</p>
+  <input type="email" id="email" placeholder="Adresse email">
+  <input type="password" id="password" placeholder="Mot de passe">
+  <button id="submit-btn">Se connecter</button>
+  <div id="status"></div>
+  <div class="toggle" id="toggle-mode">Pas encore de mot de passe ? <a id="toggle-link">Créer mon mot de passe</a></div>
+  <div class="back"><a href="index.html">← Retour à l'accueil</a></div>
+</div>
+
+<script>
+const SUPABASE_URL = "https://anofluwpjikmqqxmpawn.supabase.co";
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImFub2ZsdXdwamlrbXFxeG1wYXduIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA1OTQ4NDQsImV4cCI6MjEwNjE3MDg0NH0.LdYj-YNw6jRPtuP__GbYXMQWlIAEEu2w9s9llDhLnn0";
+const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+// ============ SUIVI DES CLICS (pour le dashboard) ============
+(function(){
+  document.addEventListener('click', function(e){
+    var el = e.target.closest('a, button');
+    if(!el) return;
+    var label = (el.textContent || el.id || 'élément').trim().slice(0,80);
+    supabase.from('page_clicks').insert([{ page:'login', element_label: label, element_id: el.id || null }]).then(function(){});
+  });
+})();
+
+let mode = 'login'; // ou 'signup'
+const params = new URLSearchParams(window.location.search);
+if(params.get('email')){ document.getElementById('email').value = params.get('email'); mode='signup'; render(); }
+
+function render(){
+  document.getElementById('title').textContent = mode==='login' ? 'Connexion' : 'Créer mon mot de passe';
+  document.getElementById('submit-btn').textContent = mode==='login' ? 'Se connecter' : 'Créer mon compte';
+  document.getElementById('toggle-mode').innerHTML = mode==='login'
+    ? 'Pas encore de mot de passe ? <a id="toggle-link">Créer mon mot de passe</a>'
+    : 'Déjà un compte ? <a id="toggle-link">Se connecter</a>';
+  document.getElementById('toggle-link').addEventListener('click', function(){ mode = mode==='login'?'signup':'login'; render(); });
+}
+render();
+
+document.getElementById('submit-btn').addEventListener('click', async function(){
+  const email = document.getElementById('email').value.trim();
+  const password = document.getElementById('password').value;
+  const statusEl = document.getElementById('status');
+  if(!email || !password){ statusEl.textContent = "Remplissez les deux champs."; return; }
+
+  if(mode === 'signup'){
+    const { data, error } = await supabase.auth.signUp({ email, password });
+    if(error){ statusEl.textContent = error.message; return; }
+    // Relie la fiche "clients" créée par le formulaire d'inscription à ce nouveau compte
+    if(data.user){
+      await supabase.from('clients').update({ user_id: data.user.id }).eq('email', email).is('user_id', null);
+    }
+    statusEl.textContent = "Compte créé ! Redirection…";
+    setTimeout(()=>{ window.location.href = 'membre.html'; }, 1000);
+  } else {
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    if(error){ statusEl.textContent = "Email ou mot de passe incorrect."; return; }
+    window.location.href = 'membre.html';
+  }
+});
+</script>
+</body>
+</html>
